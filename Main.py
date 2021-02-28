@@ -17,8 +17,7 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scopes))
 
 def main():
     print("Enter file path for streaming history JSON file: ")
-    #filePath = input()
-    filePath = 'C:/Users/medin/Downloads/my_spotify_data (1)/MyData/StreamingHistory0.json'
+    filePath = input()
 
     baseData = getBaseData(filePath)
     data = []
