@@ -2,6 +2,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import json
 import math
+import csv
 
 scopes = "playlist-read-private playlist-read-collaborative"
 
@@ -16,14 +17,20 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scopes))
 
 def main():
     print("Enter file path for streaming history JSON file: ")
-    baseData = getBaseData()
-    data = {}
+    #filePath = input()
+    filePath = 'C:/Users/medin/Downloads/my_spotify_data (1)/MyData/StreamingHistory0.json'
+
+    baseData = getBaseData(filePath)
+    data = []
 
     trackIds = [] # List to later group search the audio features
 
+    # baseData2 = [baseData[i] for i in range(10)]
+    # baseData = baseData2
+
+    print('Working... (May take several minutes)')
     # Search each item and save useful data
     for i, item in enumerate(baseData):
-        print('Querying ', item['trackName'])
 
         query = 'track:"{name}" artist:"{artist}"'.format(
             name = item['trackName'], artist = item['artistName'])
@@ -43,7 +50,7 @@ def main():
 
         trackIds.append(track['id'])
 
-        data[i] = {}
+        data.append({})
         data[i]['Title'] = track['name']
         data[i]['Time Listened'] = item['msPlayed']
         data[i]['Listen Date'] = item['endTime'].split(' ')[0]
@@ -77,11 +84,21 @@ def main():
             track['Tempo'] = item['tempo']
             track['Time Signature'] = item['time_signature']
 
+    newPath = filePath.split('.json')[0] + ' UPGRADED.csv'
+
+    with open(newPath, mode='w', newline='', encoding = 'utf8') as file:
+        writer = csv.DictWriter(file, list(data[0].keys()))
+
+        writer.writeheader()
+        writer.writerow(data[0])
+        writer.writerow(data[1])
+        for track in data:
+            writer.writerow(track)
+
+    print('Complete!')
 
 # Get the data from the original Streaming History json file provided
-def getBaseData():
-    
-    filePath = input()
+def getBaseData(filePath):
 
     if filePath == "":
         print('Program terminated.')
@@ -94,7 +111,7 @@ def getBaseData():
             return json.load(file)
     except:
         print('File not found. Try again or hit enter to cancel.')
-        return getBaseData()
+        return getBaseData(filePath)
 
 # Get all artists for a track
 def getArtists(track):
