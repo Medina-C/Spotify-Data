@@ -17,9 +17,8 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scopes))
 
 def main():
     print("Enter file path for streaming history JSON file: ")
-    filePath = input()
 
-    baseData = getBaseData(filePath)
+    baseData, filePath = getBaseData()
     data = []
 
     trackIds = [] # List to later group search the audio features
@@ -97,7 +96,8 @@ def main():
     print('Complete!')
 
 # Get the data from the original Streaming History json file provided
-def getBaseData(filePath):
+def getBaseData():
+    filePath = input()
 
     if filePath == "":
         print('Program terminated.')
@@ -105,12 +105,16 @@ def getBaseData(filePath):
 
     filePath = filePath.replace('\\', '/')
 
+    if filePath[0] == '"' and filePath[len(filePath)-1 == '"']:
+        filePath = filePath[1:len(filePath)-1]
+    print(filePath)
+
     try:
         with open(filePath, encoding = 'utf8') as file:
-            return json.load(file)
+            return json.load(file), filePath
     except:
         print('File not found. Try again or hit enter to cancel.')
-        return getBaseData(filePath)
+        return getBaseData()
 
 # Get all artists for a track
 def getArtists(track):
