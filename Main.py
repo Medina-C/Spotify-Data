@@ -12,8 +12,8 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scopes))
 #album, main artist, all artists, duration, name, popularity, item number
 #end time, end date, ms listened
 #danceability, energy, key, loudness, speechiness, acousticness, instrumentalness, valence, tempo, time signature, mode (major or minor), 
-#TODO handle songs that cannot be found
-#TODO check if songs have already been queried to save time
+#TODO handle if spreadsheet is already open
+#TODO genre and playlist
 
 def main():
     print("Enter file path for streaming history JSON file: ")
@@ -21,66 +21,79 @@ def main():
     baseData, filePath = getBaseData()
     data = []
 
-    trackIds = [] # List to later group search the audio features
+    trackIds = {} # List to later group search the audio features
 
-    # baseData2 = [baseData[i] for i in range(10)]
+    # baseData2 = [baseData[i] for i in range(500)]
     # baseData = baseData2
-
     print('Working... (May take several minutes)')
     # Search each item and save useful data
     for i, item in enumerate(baseData):
-
-        query = 'track:"{name}" artist:"{artist}"'.format(
-            name = item['trackName'], artist = item['artistName'])
-        
-        result = sp.search(q=query, market = 'CA', type = 'track')
-        
-        if len(result['tracks']['items']) < 1:
-            query = '"{name}"'.format(name = item['trackName'])
-            result = sp.search(q=query, market = 'CA', type = 'track')
-
-            if len(result['tracks']['items']) < 1:
-                print('Song {name} by {artist} could not be found. Aborting program.').format(
-                    name = item['trackName'], artist = item['artistName'])
-                exit()
-
-        track = result['tracks']['items'][0] # Assume the first result is the right one
-
-        trackIds.append(track['id'])
+  
+        track = checkAlready(data, item)
+        alreadyThere = track is not None
 
         data.append({})
-        data[i]['Title'] = track['name']
+        if alreadyThere:
+            track = track.copy()
+            data[i] = track
+            trackIds[(track['Title'], track['Principal Artist'])]['array'].append(i)
+        else:
+            query = 'track:"{name}" artist:"{artist}"'.format(
+                name = item['trackName'], artist = item['artistName'])
+            
+            result = search(query)
+            
+            if len(result['tracks']['items']) < 1:
+                query = '"{name}"'.format(name = item['trackName'])
+                result = sp.search(q=query, market = 'CA', type = 'track')
+
+                if len(result['tracks']['items']) < 1:
+                    print('Song {name} by {artist} could not be found. Skipping.'.format(
+                        name = item['trackName'], artist = item['artistName']))
+                    continue
+
+            track = result['tracks']['items'][0] # Assume the first result is the right one
+            
+            trackIds[(item['trackName'], track['artists'][0]['name'])] = {
+                'id': track['id'],
+                'array': [i]
+            }
+        
+        data[i]['Title'] = item['trackName']
         data[i]['Time Listened'] = item['msPlayed']
         data[i]['Listen Date'] = item['endTime'].split(' ')[0]
         data[i]['End Time'] = item['endTime'].split(' ')[1]
-        data[i]['Principal Artist'] = track['artists'][0]['name']
-        data[i]['All Artists'] = getArtists(track)
-        data[i]['Album'] = track['album']['name']
-        data[i]['Track Number'] = track['track_number']
-        data[i]['Length'] = track['duration_ms']
-        data[i]['Popularity'] = track['popularity']
 
+        if not alreadyThere:
+            data[i]['Principal Artist'] = track['artists'][0]['name']
+            data[i]['All Artists'] = getArtists(track)
+            data[i]['Album'] = track['album']['name']
+            data[i]['Track Number'] = track['track_number']
+            data[i]['Length'] = track['duration_ms']
+            data[i]['Popularity'] = track['popularity']
+    
     # Get the audio features in groups of 100
-    hundreds = math.ceil(len(trackIds)/100)
-
+    hundreds = math.ceil(len(list(trackIds.values()))/100)
     for i in range(hundreds):
-        group = get100Group(trackIds, i)
+        
+        idList = list(trackIds.values())
+        group = get100Group(idList, i)
         features = sp.audio_features(group)
 
-        for j, item in enumerate(features):
-            track = data[i*100 + j]
+        for j, featureSet in enumerate(features):
+            for index in idList[i*100 + j]['array']:
 
-            track['Danceability'] = item['danceability']
-            track['Energy'] = item['energy']
-            track['Key'] = keyToString(item['key'])
-            track['Loudness'] = item['loudness']
-            track['Mode'] = modeToString(item['mode'])
-            track['Speechiness'] = item['speechiness']
-            track['Acousticness'] = item['acousticness']
-            track['Instrumentalness'] = item['instrumentalness']
-            track['Positivity'] = item['valence']
-            track['Tempo'] = item['tempo']
-            track['Time Signature'] = item['time_signature']
+                data[index]['Danceability'] = featureSet['danceability']
+                data[index]['Energy'] = featureSet['energy']
+                data[index]['Key'] = keyToString(featureSet['key'])
+                data[index]['Loudness'] = featureSet['loudness']
+                data[index]['Mode'] = modeToString(featureSet['mode'])
+                data[index]['Speechiness'] = featureSet['speechiness']
+                data[index]['Acousticness'] = featureSet['acousticness']
+                data[index]['Instrumentalness'] = featureSet['instrumentalness']
+                data[index]['Positivity'] = featureSet['valence']
+                data[index]['Tempo'] = featureSet['tempo']
+                data[index]['Time Signature'] = featureSet['time_signature']
 
     newPath = filePath.split('.json')[0] + ' UPGRADED.csv'
 
@@ -88,8 +101,6 @@ def main():
         writer = csv.DictWriter(file, list(data[0].keys()))
 
         writer.writeheader()
-        writer.writerow(data[0])
-        writer.writerow(data[1])
         for track in data:
             writer.writerow(track)
 
@@ -107,7 +118,6 @@ def getBaseData():
 
     if filePath[0] == '"' and filePath[len(filePath)-1 == '"']:
         filePath = filePath[1:len(filePath)-1]
-    print(filePath)
 
     try:
         with open(filePath, encoding = 'utf8') as file:
@@ -132,7 +142,7 @@ def get100Group(list, groupNum):
         if index >= len(list):
             return result
         
-        result.append(list[index])
+        result.append(list[index]['id'])
 
     return result
 
@@ -157,5 +167,21 @@ def modeToString(mode):
         return 'Major'
     else:
         return 'Minor'
+
+def search(query):
+    try:
+        return sp.search(q=query, market = 'CA', type = 'track')
+    except:
+        print("ERROR - trying again")
+        search(query)
+
+# Check if that song has already been queried
+def checkAlready(data, check):
+    for track in data:
+        try:
+            if track['Title'] == check['trackName'] and track['Principal Artist'] == check['artistName']:
+                return track
+        except KeyError:
+            continue
 
 main()
