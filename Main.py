@@ -2,14 +2,15 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import json
 import math
-import csv
+import xlsxwriter
+from dotenv import load_dotenv
 
+load_dotenv()
 scopes = "playlist-read-private playlist-read-collaborative"
-
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scopes))
 
 # TO INCLUDE: 
-#album, main artist, all artists, duration, name, popularity, item number
+#album, main artist, duration, name, popularity, item number
 #end time, end date, ms listened
 #danceability, energy, key, loudness, speechiness, acousticness, instrumentalness, valence, tempo, time signature, mode (major or minor), 
 #TODO handle if spreadsheet is already open
@@ -23,7 +24,7 @@ def main():
 
     trackIds = {} # List to later group search the audio features
 
-    # baseData2 = [baseData[i] for i in range(500)]
+    # baseData2 = [baseData[i] for i in range(10)]
     # baseData = baseData2
     print('Working... (May take several minutes)')
     # Search each item and save useful data
@@ -36,7 +37,7 @@ def main():
         if alreadyThere:
             track = track.copy()
             data[i] = track
-            trackIds[(track['Title'], track['Principal Artist'])]['array'].append(i)
+            trackIds[(track['Title'], track['Artist'])]['array'].append(i)
         else:
             query = 'track:"{name}" artist:"{artist}"'.format(
                 name = item['trackName'], artist = item['artistName'])
@@ -65,8 +66,7 @@ def main():
         data[i]['End Time'] = item['endTime'].split(' ')[1]
 
         if not alreadyThere:
-            data[i]['Principal Artist'] = track['artists'][0]['name']
-            data[i]['All Artists'] = getArtists(track)
+            data[i]['Artist'] = track['artists'][0]['name']
             data[i]['Album'] = track['album']['name']
             data[i]['Track Number'] = track['track_number']
             data[i]['Length'] = track['duration_ms']
@@ -95,15 +95,19 @@ def main():
                 data[index]['Tempo'] = featureSet['tempo']
                 data[index]['Time Signature'] = featureSet['time_signature']
 
-    newPath = filePath.split('.json')[0] + ' UPGRADED.csv'
+    # Export data
+    newPath = filePath.split('.json')[0] + ' UPGRADED.xlsx'
+    workbook = xlsxwriter.Workbook(newPath)
+    sheet = workbook.add_worksheet()
+    bold = workbook.add_format({'bold': True})
 
-    with open(newPath, mode='w', newline='', encoding = 'utf8') as file:
-        writer = csv.DictWriter(file, list(data[0].keys()))
+    keys = data[0].keys()
+    sheet.write_row(0, 0, keys, bold)
 
-        writer.writeheader()
-        for track in data:
-            writer.writerow(track)
+    for i, item in enumerate(data):
+        sheet.write_row(i+1, 0, item.values())
 
+    workbook.close()
     print('Complete!')
 
 # Get the data from the original Streaming History json file provided
@@ -125,13 +129,6 @@ def getBaseData():
     except:
         print('File not found. Try again or hit enter to cancel.')
         return getBaseData()
-
-# Get all artists for a track
-def getArtists(track):
-    artists = []
-    for artist in track['artists']:
-        artists.append(artist['name'])
-    return artists
 
 # Gets the groupNumth group of 100 items in the list
 def get100Group(list, groupNum):
@@ -179,7 +176,7 @@ def search(query):
 def checkAlready(data, check):
     for track in data:
         try:
-            if track['Title'] == check['trackName'] and track['Principal Artist'] == check['artistName']:
+            if track['Title'] == check['trackName'] and track['Artist'] == check['artistName']:
                 return track
         except KeyError:
             continue

@@ -15,7 +15,3 @@ You need to create an app on Spotify's developer website and add the app's IDs t
 2. The program will run through every song in that file. If it can't find something (it won't find podcasts, for example) it will output a message and skip that item.
 3. It will take several minutes to complete. It will print a message when done.
 4. When finished, it will output a csv file with all of your data.
-
-## Handling the output
-
-The program outputs a csv file, which does not work well in Excel (I am working on fixing this). If you keep it like that and try to make a separate sheet with a pivot table or filtered data or anything, it will overwrite the full data when you exit Excel. I highly recommend copying all of the provided data and pasting it into a proper Excel workbook before doing anything with it.
