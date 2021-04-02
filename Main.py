@@ -24,9 +24,14 @@ def main():
 
     trackIds = {} # List to later group search the audio features
 
-    # baseData2 = [baseData[i] for i in range(10)]
+    # baseData2 = [baseData[i] for i in range(30)]
     # baseData = baseData2
     print('Working... (May take several minutes)')
+
+    print('Loading user data...')
+    playlistSongs = getPlaylistSongs()
+
+    print('Querying songs...')
     # Search each item and save useful data
     for i, item in enumerate(baseData):
   
@@ -70,6 +75,13 @@ def main():
             data[i]['Album'] = track['album']['name']
             data[i]['Track Number'] = track['track_number']
             data[i]['Length'] = track['duration_ms']
+
+            # Just using the first for now
+            if track['id'] in playlistSongs.keys():
+                data[i]['Playlist'] = playlistSongs[track['id']][0]
+            else:
+                data[i]['Playlist'] = ''
+
             data[i]['Popularity'] = track['popularity']
     
     # Get the audio features in groups of 100
@@ -109,6 +121,33 @@ def main():
 
     workbook.close()
     print('Complete!')
+
+# Get user's playlists
+def getPlaylistSongs():
+    rawData = (sp.current_user_playlists())['items']
+
+    playlistIds = []
+    playlistNames = []
+    for item in rawData:
+        playlistIds.append(item['id'])
+        playlistNames.append(item['name'])
+
+    total = {}
+    for i in range(len(playlistIds)):
+        thisSet = {'items': ['temp']}
+        offset = 0
+
+        while thisSet['items'] != []:
+            thisSet = sp.playlist_items(playlistIds[i], fields = 'items(track(id))', limit=100, offset=offset)
+            offset += 100
+            
+            for item in thisSet['items']:
+                track = item['track']['id']
+                if track not in total.keys():
+                    total[track] = []
+                total[track].append(playlistNames[i])
+
+    return total
 
 # Get the data from the original Streaming History json file provided
 def getBaseData():
