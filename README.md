@@ -6,7 +6,7 @@ Expands the base streaming history data provided when you download your Spotify 
 
 You need to create an app on Spotify's developer website and add the app's IDs to this program for it to work.
 
-1. Install the spotipy api with `pip install spotipy`.
+1. Install the required apis: `spotipy`, `python-dotenv`, and `xlsxwriter`.
 2. Follow the steps in [these instructions](https://developer.spotify.com/documentation/general/guides/app-settings/) to create an app and set the redirect uri (I use `http://localhost:8888/callback` which works fine).
 3. Edit the **.env** file and insert your client ID, client secret, and redirect uri in between the quotations.
 
